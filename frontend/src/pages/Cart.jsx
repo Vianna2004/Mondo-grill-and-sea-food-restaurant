@@ -1,38 +1,67 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import '../styles/Cart.css';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { UserContext } from '../context/userContext';
 
 const Cart = () => {
   const navigate = useNavigate();
-  const [cartItems, setCartItems] = useState(() => {
-    const savedCart = localStorage.getItem('cart');
-    return savedCart ? JSON.parse(savedCart) : [];
-  });
+  const { backendUrl, token } = useContext(UserContext);
+  const [cartItems, setCartItems] = useState([]);
 
-  // Update localStorage whenever cart changes
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cartItems));
-  }, [cartItems]);
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+    fetchCart();
+  }, [token]);
+
+  const fetchCart = async () => {
+    try {
+      const userId = JSON.parse(atob(token.split('.')[1])).id;
+      const res = await axios.get(`${backendUrl}/api/user/cart/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCartItems(res.data.cart.products.map(p => ({
+        ...p.product,
+        quantity: p.quantity
+      })));
+    } catch (err) {
+      setCartItems([]);
+    }
+  };
 
   // Increase quantity
-  const handleIncreaseQuantity = (id) => {
-    setCartItems(cartItems.map(item =>
-      item.id === id ? { ...item, quantity: item.quantity + 1 } : item
-    ));
+  const handleIncreaseQuantity = async (id) => {
+    await updateCartQuantity(id, 1);
   };
 
   // Decrease quantity
-  const handleDecreaseQuantity = (id) => {
-    setCartItems(cartItems.map(item =>
-      item.id === id && item.quantity > 1
-        ? { ...item, quantity: item.quantity - 1 }
-        : item
-    ));
+  const handleDecreaseQuantity = async (id) => {
+    await updateCartQuantity(id, -1);
   };
 
   // Remove item from cart
-  const handleRemoveItem = (id) => {
-    setCartItems(cartItems.filter(item => item.id !== id));
+  const handleRemoveItem = async (id) => {
+    await updateCartQuantity(id, 0, true);
+  };
+
+  const updateCartQuantity = async (productId, change, remove = false) => {
+    try {
+      const userId = JSON.parse(atob(token.split('.')[1])).id;
+      await axios.post(`${backendUrl}/api/user/update-cart`, {
+        userId,
+        productId,
+        change,
+        remove
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchCart();
+    } catch (err) {
+      alert('Failed to update cart');
+    }
   };
 
   // Calculate total price
@@ -71,7 +100,7 @@ const Cart = () => {
             <div className="cart-items-section">
               <div className="items-list">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="cart-item">
+                  <div key={item._id || item.id} className="cart-item">
                     <div className="item-image-wrapper">
                       <div className="item-image placeholder">
                         <img src={item.image} alt={item.name} />
@@ -95,7 +124,7 @@ const Cart = () => {
                     <div className="quantity-control">
                       <button
                         className="qty-btn minus-btn"
-                        onClick={() => handleDecreaseQuantity(item.id)}
+                        onClick={() => handleDecreaseQuantity(item._id || item.id)}
                         disabled={item.quantity === 1}
                       >
                         −
@@ -103,7 +132,7 @@ const Cart = () => {
                       <span className="quantity-display">{item.quantity}</span>
                       <button
                         className="qty-btn plus-btn"
-                        onClick={() => handleIncreaseQuantity(item.id)}
+                        onClick={() => handleIncreaseQuantity(item._id || item.id)}
                       >
                         +
                       </button>
@@ -111,7 +140,7 @@ const Cart = () => {
 
                     <button
                       className="remove-btn"
-                      onClick={() => handleRemoveItem(item.id)}
+                      onClick={() => handleRemoveItem(item._id || item.id)}
                       title="Remove from cart"
                     >
                       🗑️ Remove

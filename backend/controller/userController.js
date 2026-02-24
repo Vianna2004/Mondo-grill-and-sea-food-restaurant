@@ -1,3 +1,19 @@
+// Get cart by userId
+import cartModel from '../models/cartModel.js';
+
+const getCartByUserId = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const cart = await cartModel.findOne({ user: userId }).populate('products.product');
+        if (!cart) {
+            return res.status(200).json({ cart: { products: [] } });
+        }
+        return res.status(200).json({ cart });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+};
 import bcrypt from 'bcrypt';
 import userModel from "../models/userModel.js";
 import jwt from 'jsonwebtoken';
@@ -92,4 +108,19 @@ const adminLogin = async (req, res) => {
     }
 }
 
-export { registerUser, loginUser, adminLogin }
+//export { registerUser, loginUser, adminLogin }
+
+// New: Admin get all users
+//import userModel from "../models/userModel.js";
+
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await userModel.find({}, '-password');
+        return res.status(200).json({ users });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+};
+
+export { registerUser, loginUser, adminLogin, getAllUsers, getCartByUserId };

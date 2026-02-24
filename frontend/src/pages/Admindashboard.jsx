@@ -1,26 +1,95 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import '../styles/AdminDashboard.css';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { UserContext } from '../context/userContext';
+import { AdminContext } from '../context/AdminContext';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('orders');
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [carts, setCarts] = useState([]);
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
     preparingOrders: 0,
     deliveryOrders: 0,
     deliveredOrders: 0,
-    totalUsers: 0
+    totalUsers: 0,
+    totalProducts: 0
   });
+  const { backendUrl, token } = useContext(UserContext);
+  const { isAdmin } = useContext(AdminContext);
 
-  // Initialize data from localStorage
   useEffect(() => {
-    loadOrders();
-    loadUsers();
-  }, []);
+    if (!isAdmin) {
+      navigate('/login');
+      return;
+    }
+    fetchAll();
+  }, [isAdmin]);
+
+  const fetchAll = async () => {
+    await Promise.all([
+      fetchProducts(),
+      fetchUsers(),
+      fetchCarts()
+    ]);
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/api/product/get-products`);
+      setProducts(res.data.products);
+      setStats(s => ({ ...s, totalProducts: res.data.products.length }));
+    } catch (err) {
+      setProducts([]);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/api/user/all-users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUsers(res.data.users);
+      setStats(s => ({ ...s, totalUsers: res.data.users.length }));
+    } catch (err) {
+      setUsers([]);
+    }
+  };
+
+  const fetchCarts = async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/api/product/admin-carts`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCarts(res.data.carts);
+      setStats(s => ({ ...s, totalOrders: res.data.carts.length }));
+    } catch (err) {
+      setCarts([]);
+    }
+  };
+
+  // Product actions
+  const handleDeleteProduct = async (id) => {
+    if (!window.confirm('Delete this product?')) return;
+    try {
+      await axios.delete(`${backendUrl}/api/product/delete-product/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchProducts();
+    } catch (err) {
+      alert('Failed to delete product');
+    }
+  };
+
+  const handleEditProduct = (id) => {
+    navigate(`/edit-product/${id}`);
+  };
 
   const loadOrders = () => {
     const savedOrders = localStorage.getItem('orders');
@@ -427,8 +496,35 @@ const AdminDashboard = () => {
               </button>
             </div>
             <div className="products-list">
-              {/* Here you can list existing products, but for now, just the add button */}
-              <p>Manage your products here. Click "Add New Product" to add items to your menu.</p>
+              {products.length > 0 ? (
+                <table className="admin-products-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Category</th>
+                      <th>Price</th>
+                      <th>Description</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map(product => (
+                      <tr key={product._id}>
+                        <td>{product.name}</td>
+                        <td>{product.category}</td>
+                        <td>KES {product.price}</td>
+                        <td>{product.description}</td>
+                        <td>
+                          <button onClick={() => handleEditProduct(product._id)} className="edit-btn">✏️ Edit</button>
+                          <button onClick={() => handleDeleteProduct(product._id)} className="delete-btn">🗑️ Delete</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p>No products found.</p>
+              )}
             </div>
           </div>
         )}

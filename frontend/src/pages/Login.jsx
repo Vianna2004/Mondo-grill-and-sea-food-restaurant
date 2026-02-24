@@ -90,17 +90,29 @@ const Login = () => {
       }
     
 
-      // Save user info to localStorage
+      // Save user info to localStorage and update context
       localStorage.setItem('token', data.token)
+      setToken && setToken(data.token)
      // localStorage.setItem('userRole', userRole)
 
-      // Navigate based on role
+      // Navigate based on role and token payload
       if (userRole === 'customer') {
         navigate('/menu')
       } else if (userRole === 'admin') {
-        //localStorage.setItem('adminLoggedIn', 'true')
-        navigate('/admin-dashboard')
+        // Check token payload for admin role
+        try {
+          const payload = JSON.parse(atob(data.token.split('.')[1]));
+          if (payload.role === 'admin') {
+            navigate('/admin-dashboard')
+          } else {
+            setError('You are not authorized as admin.');
+          }
+        } catch (e) {
+          setError('Invalid admin token.');
+        }
       }
+      // update context token for other parts of the app
+      setToken && setToken(data.token)
       setLoading(false)
     } catch (error) {
       console.error('Login error:', error)

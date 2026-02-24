@@ -11,6 +11,7 @@ import Payment from './pages/Payment'
 import Myorder from './pages/Myorder'
 import Admindashboard from './pages/Admindashboard'
 import Popup from './pages/Popup'
+import AddProducts from './pages/AddProducts'
 
 const App = () => {
   return (
@@ -26,6 +27,7 @@ const App = () => {
         <Route path='/payment' element={<Payment />} />
         <Route path='/my-order' element={<Myorder />} />
         <Route path='/admin-dashboard' element={<Admindashboard />} />
+        <Route path='/add-products' element={<AddProducts />} />
         {/* <Route path='/login-popup' element={<Popup />} /> */}
       </Routes>
     </div>

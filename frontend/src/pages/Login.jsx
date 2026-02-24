@@ -10,12 +10,13 @@ import { UserContext } from '../context/userContext'
 const Login = () => {
   const navigate = useNavigate()
   const [userRole, setUserRole] = useState(null)
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [login, setLogin] = useState(false)
+  const [login, setLogin] = useState('signup')
 
   const { backendUrl, token, setToken } = useContext(UserContext);
 
@@ -45,6 +46,8 @@ const Login = () => {
   //   // Simulate login request - allow any valid format for testing
   //
 
+ 
+
   const onSubmit = async (e) => {
     e.preventDefault()
     const v = validate()
@@ -60,8 +63,23 @@ const Login = () => {
     setLoading(true)
 
     try {
-      //const baseUrl = backendUrl || import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
-      const response = await axios.post(backendUrl + '/api/user/login', { email, password })
+
+      if (login === 'signup' && userRole === 'customer') {
+        const { data } = await axios.post(backendUrl + '/api/user/register', { name, email, password })
+        if (data?.token) {
+          setToken(data.token)
+          alert('Signup successful! Please log in now.')
+          setLogin('login')
+        } else {
+          setError(data.message || 'Signup failed')
+        }
+        setLoading(false)
+        return
+      }
+
+      // Use different endpoint based on role
+      const endpoint = userRole === 'admin' ? '/api/user/admin-login' : '/api/user/login'
+      const response = await axios.post(backendUrl + endpoint, { email, password })
 
       const data = response.data
 
@@ -70,6 +88,7 @@ const Login = () => {
         setLoading(false)
         return
       }
+    
 
       // Save user info to localStorage
       localStorage.setItem('token', data.token)
@@ -145,7 +164,7 @@ const Login = () => {
         </button>
 
         <h1 className="login-title">
-          {userRole === 'customer' ? '🍽️ Customer Login' : '👨‍💼 Admin Login'}
+          {userRole === 'customer' ? `🍽️ Customer ${login === 'signup' ? 'Sign Up' : 'Sign In'}` : '🧑‍💼Admin Login'}
         </h1>
         <p className="login-subtitle">
           {userRole === 'customer' ? 'Sign in to order your favorite dishes' : 'Sign in to manage your restaurant'}
@@ -158,6 +177,19 @@ const Login = () => {
         )}
 
         <form onSubmit={onSubmit} className="login-form">
+
+         {login === 'signup' && userRole === 'customer' && <div className="form-group">
+            <label htmlFor="name">Name</label>
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="form-input"
+              placeholder="name"
+            />
+          </div>}
+
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
@@ -205,18 +237,52 @@ const Login = () => {
             </button>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="submit-btn"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
+          {login === 'signup' && userRole === 'customer' ? (
+            <button
+              type="submit"
+              disabled={loading}
+              className="submit-btn"
+            >
+              {loading ? 'Signing up...' : 'Sign Up'}
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={loading}
+              className="submit-btn"
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+          )}
         </form>
 
         {/* <p className="test-note">
           💡 For testing: Use any email (e.g., test@test.com) and password (min 6 characters)
         </p> */}
+
+        {userRole === 'customer' && (
+          login === 'signup' ? (
+            <p className="toggle-login">
+              Already have an account?{' '}
+              <button
+                className="toggle-login-btn"
+                onClick={() => setLogin('login')}
+              >
+                Sign In
+              </button>
+            </p>
+          ) : (
+            <p className="toggle-login">
+              Don't have an account?{' '}
+              <button
+                className="toggle-login-btn"
+                onClick={() => setLogin('signup')}
+              >
+                Sign Up
+              </button>
+            </p>
+          )
+        )}
       </div>
     </div>
   )

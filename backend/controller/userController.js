@@ -66,5 +66,30 @@ const loginUser = async (req, res) => {
     }
 }
 
+const adminLogin = async (req, res) => {
+    try {
+        const { email, password } = req.body;
 
-export { registerUser, loginUser }
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Please provide email and password' });
+        }
+
+        // Verify against admin credentials from environment variables
+        if (email !== process.env.ADMIN_EMAIL || password !== process.env.ADMIN_PASSWORD) {
+            return res.status(401).json({ message: 'Invalid admin credentials' });
+        }
+
+        const token = jwt.sign(
+            { email: process.env.ADMIN_EMAIL, role: 'admin' },
+            process.env.JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+        res.status(200).json({ message: 'Admin login successful', token });
+        
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+}
+
+export { registerUser, loginUser, adminLogin }

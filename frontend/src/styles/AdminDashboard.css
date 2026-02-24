@@ -559,3 +559,44 @@
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, #FF8C42 0%, #44A08D 100%);
 }
+
+/* Products Management */
+.products-management {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  box-shadow: var(--shadow);
+}
+
+.products-management h2 {
+  font-size: 28px;
+  color: var(--dark-color);
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.product-actions {
+  margin-bottom: 20px;
+}
+
+.add-product-btn {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow);
+}
+
+.add-product-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.products-list {
+  color: var(--dark-color);
+}

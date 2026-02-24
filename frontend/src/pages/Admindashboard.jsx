@@ -220,9 +220,7 @@ const AdminDashboard = () => {
       <div className="admin-header">
         <div className="admin-header-content">
           <h1>👨‍💼 Admin Dashboard</h1>
-          <button className="logout-btn" onClick={handleLogout}>
-            🚪 Logout
-          </button>
+          {/* <button onClick={() => navigate('/add-products')} className="p-10 rounded full bg-blue-800 text-white font-semibold hover:scale-105 cursor-pointer">Add Product</button> */}
         </div>
       </div>
 
@@ -285,6 +283,12 @@ const AdminDashboard = () => {
           onClick={() => setActiveTab('users')}
         >
           👥 User Management
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'products' ? 'active' : ''}`}
+          onClick={() => setActiveTab('products')}
+        >
+          🍽️ Product Management
         </button>
       </div>
 
@@ -406,6 +410,25 @@ const AdminDashboard = () => {
               ) : (
                 <div className="no-data">No users found</div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Products Tab */}
+        {activeTab === 'products' && (
+          <div className="products-management">
+            <h2>Product Management</h2>
+            <div className="product-actions">
+              <button
+                className="add-product-btn"
+                onClick={() => navigate('/add-products')}
+              >
+                ➕ Add New Product
+              </button>
+            </div>
+            <div className="products-list">
+              {/* Here you can list existing products, but for now, just the add button */}
+              <p>Manage your products here. Click "Add New Product" to add items to your menu.</p>
             </div>
           </div>
         )}

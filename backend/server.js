@@ -4,6 +4,7 @@ import connectDb from './config/mongoDb.js';
 import userRouter from './routes/userRoute.js';
 import cors from 'cors';
 import productRouter from './routes/productRoutes.js';
+import adminRouter from './routes/adminRoute.js';
 
 dotenv.config();
 
@@ -15,11 +16,7 @@ app.use(cors({ origin: 'http://localhost:5173' }));
 app.use(express.json());
 app.use('/api/user', userRouter)
 app.use('/api/product', productRouter)
-
-app.get('/', (req, res) => {
-    res.send('Hello from server, welcome');
-})
-
+app.use('/api/admin', adminRouter)
 
 
 

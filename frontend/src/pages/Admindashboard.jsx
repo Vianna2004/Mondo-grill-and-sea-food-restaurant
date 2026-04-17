@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import '../styles/AdminDashboard.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { io } from 'socket.io-client';
 import { UserContext } from '../context/userContext';
 import { AdminContext } from '../context/AdminContext';
 
@@ -32,11 +33,33 @@ const AdminDashboard = () => {
     fetchAll();
   }, [isAdmin]);
 
+  // Socket for realtime orders
+  useEffect(() => {
+    if (!isAdmin) return;
+    let socket;
+    try {
+      socket = io(backendUrl);
+      socket.on('newOrder', (order) => {
+        // refresh order list
+        fetchOrders();
+      });
+      socket.on('orderUpdated', (order) => {
+        fetchOrders();
+      });
+    } catch (e) {
+      console.warn('Admin socket failed', e);
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [isAdmin, backendUrl]);
+
   const fetchAll = async () => {
     await Promise.all([
       fetchProducts(),
       fetchUsers(),
-      fetchCarts()
+      fetchCarts(),
+      fetchOrders()
     ]);
   };
 
@@ -74,6 +97,20 @@ const AdminDashboard = () => {
     }
   };
 
+  // Fetch orders from backend
+  const fetchOrders = async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/api/order/all`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setOrders(res.data.orders || []);
+      calculateStats(res.data.orders || [], users);
+    } catch (err) {
+      console.error('Failed to fetch orders', err);
+      setOrders([]);
+    }
+  };
+
   // Product actions
   const handleDeleteProduct = async (id) => {
     if (!window.confirm('Delete this product?')) return;
@@ -92,73 +129,8 @@ const AdminDashboard = () => {
   };
 
   const loadOrders = () => {
-    const savedOrders = localStorage.getItem('orders');
-    if (savedOrders) {
-      const ordersList = JSON.parse(savedOrders);
-      setOrders(ordersList);
-      calculateStats(ordersList, users);
-    } else {
-      // Create mock orders if none exist
-      const mockOrders = [
-        {
-          id: 'ORD-001',
-          date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-          status: 'Out for Delivery',
-          items: [
-            { name: 'Grilled Tilapia', quantity: 2, price: 850 },
-            { name: 'Mango Juice', quantity: 1, price: 150 }
-          ],
-          total: 1850,
-          estimatedTime: '14:30 - 15:00',
-          customerName: 'John Doe',
-          customerEmail: 'john@example.com',
-          customerPhone: '0712345678'
-        },
-        {
-          id: 'ORD-002',
-          date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-          status: 'Preparing',
-          items: [
-            { name: 'Mombasa Seafood Platter', quantity: 1, price: 1200 }
-          ],
-          total: 1200,
-          estimatedTime: '18:00 - 18:30',
-          customerName: 'Jane Smith',
-          customerEmail: 'jane@example.com',
-          customerPhone: '0723456789'
-        },
-        {
-          id: 'ORD-003',
-          date: new Date(Date.now() - 30 * 60 * 1000),
-          status: 'Pending',
-          items: [
-            { name: 'Calamari Rings', quantity: 1, price: 450 },
-            { name: 'Fresh Mango Juice', quantity: 2, price: 150 }
-          ],
-          total: 750,
-          estimatedTime: '15:30 - 16:00',
-          customerName: 'Mike Johnson',
-          customerEmail: 'mike@example.com',
-          customerPhone: '0734567890'
-        },
-        {
-          id: 'ORD-004',
-          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          status: 'Delivered',
-          items: [
-            { name: 'Pan-Seared Snapper', quantity: 1, price: 920 }
-          ],
-          total: 920,
-          estimatedTime: 'Delivered',
-          customerName: 'Sarah Williams',
-          customerEmail: 'sarah@example.com',
-          customerPhone: '0745678901'
-        }
-      ];
-      setOrders(mockOrders);
-      localStorage.setItem('orders', JSON.stringify(mockOrders));
-      calculateStats(mockOrders, users);
-    }
+    // fetch from backend
+    fetchOrders();
   };
 
   const loadUsers = () => {
@@ -228,24 +200,28 @@ const AdminDashboard = () => {
   };
 
   // Update order status
-  const updateOrderStatus = (orderId, newStatus) => {
-    const updatedOrders = orders.map(order =>
-      order.id === orderId ? { ...order, status: newStatus } : order
-    );
-    setOrders(updatedOrders);
-    localStorage.setItem('orders', JSON.stringify(updatedOrders));
-    calculateStats(updatedOrders, users);
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      await axios.put(`${backendUrl}/api/order/${orderId}/status`, { status: newStatus }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // optimistic update will be reconciled by socket event
+    } catch (err) {
+      console.error('Failed to update order status', err);
+    }
   };
 
-  // Toggle user suspension
-  const toggleUserStatus = (userId) => {
-    const updatedUsers = users.map(user =>
-      user.id === userId
-        ? { ...user, status: user.status === 'active' ? 'suspended' : 'active' }
-        : user
-    );
-    setUsers(updatedUsers);
-    localStorage.setItem('users', JSON.stringify(updatedUsers));
+  // Toggle user suspension (call backend)
+  const toggleUserStatus = async (userId) => {
+    try {
+      await axios.put(`${backendUrl}/api/user/toggle-user/${userId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // refresh users list
+      fetchUsers();
+    } catch (err) {
+      console.error('Failed to toggle user status', err);
+    }
   };
 
   const handleLogout = () => {
@@ -370,9 +346,9 @@ const AdminDashboard = () => {
             <div className="orders-grid">
               {orders.length > 0 ? (
                 orders.map(order => (
-                  <div key={order.id} className="order-card-admin">
+                  <div key={order._id} className="order-card-admin">
                     <div className="order-header-admin">
-                      <span className="order-id-admin">{order.id}</span>
+                      <span className="order-id-admin">{order._id}</span>
                       <span className={`status-badge ${getStatusColor(order.status)}`}>
                         {getStatusIcon(order.status)} {order.status}
                       </span>
@@ -403,7 +379,7 @@ const AdminDashboard = () => {
                           {order.status === 'Pending' && (
                             <button
                               className="action-btn preparing"
-                              onClick={() => updateOrderStatus(order.id, 'Preparing')}
+                              onClick={() => updateOrderStatus(order._id, 'Preparing')}
                             >
                               👨‍🍳 Start Preparing
                             </button>
@@ -411,7 +387,7 @@ const AdminDashboard = () => {
                           {order.status === 'Preparing' && (
                             <button
                               className="action-btn delivery"
-                              onClick={() => updateOrderStatus(order.id, 'Out for Delivery')}
+                              onClick={() => updateOrderStatus(order._id, 'Out for Delivery')}
                             >
                               🚚 Send to Delivery
                             </button>
@@ -419,7 +395,7 @@ const AdminDashboard = () => {
                           {order.status === 'Out for Delivery' && (
                             <button
                               className="action-btn delivered"
-                              onClick={() => updateOrderStatus(order.id, 'Delivered')}
+                              onClick={() => updateOrderStatus(order._id, 'Delivered')}
                             >
                               ✓ Mark Delivered
                             </button>
@@ -455,12 +431,12 @@ const AdminDashboard = () => {
               </div>
               {users.length > 0 ? (
                 users.map(user => (
-                  <div key={user.id} className="table-row">
+                  <div key={user._id || user.id} className="table-row">
                     <div className="col">{user.name}</div>
                     <div className="col">{user.email}</div>
-                    <div className="col">{user.phone}</div>
-                    <div className="col">{user.totalOrders}</div>
-                    <div className="col">KES {user.totalSpent.toLocaleString()}</div>
+                    <div className="col">{user.phone || '-'}</div>
+                    <div className="col">{user.totalOrders || '-'}</div>
+                    <div className="col">{user.totalSpent ? `KES ${user.totalSpent.toLocaleString()}` : '-'}</div>
                     <div className="col">
                       <span className={`user-status ${user.status}`}>
                         {user.status === 'active' ? '✓ Active' : '⛔ Suspended'}
@@ -469,7 +445,7 @@ const AdminDashboard = () => {
                     <div className="col action-col">
                       <button
                         className={`toggle-btn ${user.status}`}
-                        onClick={() => toggleUserStatus(user.id)}
+                        onClick={() => toggleUserStatus(user._id || user.id)}
                       >
                         {user.status === 'active' ? 'Suspend' : 'Reactivate'}
                       </button>

@@ -1,5 +1,5 @@
 import express from "express";
-import { addProduct, deleteProduct, getProducts, updateProduct, getProductQuantity, addToCart, getAllCarts } from "../controller/productController.js";
+import { addProduct, deleteProduct, getProducts, updateProduct, getProductQuantity, addToCart, getAllCarts, getProductById } from "../controller/productController.js";
 import adminAuth from "../middleware/adminAuth.js";
 
 const productRouter = express.Router();
@@ -12,5 +12,6 @@ productRouter.put('/update-product/:id', adminAuth, updateProduct);
 productRouter.get('/product-quantity', adminAuth, getProductQuantity);
 productRouter.post('/add-to-cart', addToCart);
 productRouter.get('/admin-carts', adminAuth, getAllCarts);
+productRouter.get('/get-product/:id', getProductById);
 
 export default productRouter

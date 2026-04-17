@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import '../styles/Payment.css';
 import { useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
+import { UserContext } from '../context/userContext';
 
 const Payment = () => {
   const navigate = useNavigate();
@@ -131,6 +133,37 @@ const Payment = () => {
     localStorage.removeItem('cart');
     navigate('/menu');
   };
+
+  // create order on backend when payment succeeds
+  const { backendUrl } = useContext(UserContext);
+
+  useEffect(() => {
+    if (!paymentSuccess) return;
+
+    const createOrderOnServer = async () => {
+      try {
+        const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+        const customerName = savedUser.name || (paymentMethod === 'mpesa' ? mpesaForm.fullName : bankForm.cardholderName);
+        const customerEmail = savedUser.email || (paymentMethod === 'mpesa' ? mpesaForm.email : bankForm.email);
+        const customerPhone = savedUser.phone || (paymentMethod === 'mpesa' ? mpesaForm.phoneNumber : '');
+
+        const payload = {
+          customerName,
+          customerEmail,
+          customerPhone,
+          items,
+          total: orderTotal
+        };
+
+        await axios.post(`${backendUrl}/api/order/create`, payload);
+      } catch (err) {
+        console.error('Failed to create order on server', err);
+      }
+    };
+
+    createOrderOnServer();
+  }, [paymentSuccess]);
 
   const handleBackToCart = () => {
     navigate('/cart');

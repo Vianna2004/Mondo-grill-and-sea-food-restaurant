@@ -1,102 +1,70 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import '../styles/MyOrder.css';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { io } from 'socket.io-client';
+import { UserContext } from '../context/userContext';
 
 const MyOrder = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [activeTab, setActiveTab] = useState('all');
-  const [deliveredOrders, setDeliveredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { backendUrl } = useContext(UserContext);
+
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userEmail = user.email || '';
 
   useEffect(() => {
+    let socket;
+
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        if (!userEmail) {
+          setOrders([]);
+          setLoading(false);
+          return;
+        }
+        const res = await axios.get(`${backendUrl}/api/order/user/${encodeURIComponent(userEmail)}`);
+        setOrders(res.data.orders || []);
+        setLoading(false);
+      } catch (err) {
+        console.error('Failed to load orders', err);
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+
     try {
-      const savedOrders = localStorage.getItem('orders');
-      const savedDelivered = localStorage.getItem('deliveredOrders');
-
-      if (savedDelivered) {
-        setDeliveredOrders(JSON.parse(savedDelivered));
-      }
-
-      if (savedOrders) {
-        setOrders(JSON.parse(savedOrders));
-      } else {
-        // Mock orders data
-        const mockOrders = [
-          {
-            id: 'ORD-001',
-            date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-            status: 'Out for Delivery',
-            items: [
-              { name: 'Grilled Tilapia', quantity: 2, price: 850 },
-              { name: 'Mango Juice', quantity: 1, price: 150 }
-            ],
-            total: 1850,
-            estimatedTime: '14:30 - 15:00'
-          },
-          {
-            id: 'ORD-002',
-            date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-            status: 'Delivered',
-            items: [
-              { name: 'Calamari Rings', quantity: 1, price: 450 },
-              { name: 'Prawn Skewers', quantity: 1, price: 550 }
-            ],
-            total: 1000,
-            estimatedTime: 'Delivered'
-          },
-          {
-            id: 'ORD-003',
-            date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-            status: 'Preparing',
-            items: [
-              { name: 'Mombasa Seafood Platter', quantity: 1, price: 1200 },
-              { name: 'Coconut Water', quantity: 2, price: 120 }
-            ],
-            total: 1440,
-            estimatedTime: '18:00 - 18:30'
-          },
-          {
-            id: 'ORD-004',
-            date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-            status: 'Delivered',
-            items: [
-              { name: 'Pan-Seared Snapper', quantity: 1, price: 920 },
-              { name: 'Fresh Fruit Salad', quantity: 1, price: 250 }
-            ],
-            total: 1170,
-            estimatedTime: 'Delivered'
-          }
-        ];
-
-        setOrders(mockOrders);
-        localStorage.setItem('orders', JSON.stringify(mockOrders));
-      }
-      setLoading(false);
-    } catch (error) {
-      console.error('Error loading orders:', error);
-      setLoading(false);
-    }
-  }, []);
-
-  // Save delivered orders to localStorage
-  useEffect(() => {
-    localStorage.setItem('deliveredOrders', JSON.stringify(deliveredOrders));
-  }, [deliveredOrders]);
-
-  // Mark order as delivered
-  const handleMarkDelivered = (orderId) => {
-    // Add to delivered list
-    if (!deliveredOrders.includes(orderId)) {
-      setDeliveredOrders([...deliveredOrders, orderId]);
+      socket = io(backendUrl);
+      socket.on('newOrder', (order) => {
+        if (order.customerEmail === userEmail) {
+          setOrders(prev => [order, ...prev]);
+        }
+      });
+      socket.on('orderUpdated', (order) => {
+        if (order.customerEmail === userEmail) {
+          setOrders(prev => prev.map(o => (o._id === order._id ? order : o)));
+        }
+      });
+    } catch (e) {
+      console.warn('Socket connection failed', e);
     }
 
-    // Update order status
-    setOrders(orders.map(order =>
-      order.id === orderId
-        ? { ...order, status: 'Delivered', estimatedTime: 'Delivered' }
-        : order
-    ));
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [backendUrl, userEmail]);
+
+  // Mark order as delivered (customer action)
+  const handleMarkDelivered = async (orderId) => {
+    try {
+      await axios.put(`${backendUrl}/api/order/${orderId}/status`, { status: 'Delivered' });
+    } catch (err) {
+      console.error('Failed to mark delivered', err);
+    }
   };
 
   // Filter orders based on active tab
@@ -187,11 +155,11 @@ const MyOrder = () => {
         {filteredOrders.length > 0 ? (
           <>
             {filteredOrders.map((order) => (
-              <div key={order.id} className="order-card">
+              <div key={order._id} className="order-card">
                 {/* Order Header */}
                 <div className="order-header-row">
                   <div className="order-meta">
-                    <h3 className="order-id">{order.id}</h3>
+                    <h3 className="order-id">{order._id}</h3>
                     <span className="order-date">
                       {new Date(order.date).toLocaleDateString('en-KE', {
                         weekday: 'short',
@@ -261,10 +229,10 @@ const MyOrder = () => {
 
                   {/* Delivery Confirmation Button */}
                   <div className="order-actions">
-                    {order.status === 'Out for Delivery' && !deliveredOrders.includes(order.id) ? (
+                    {order.status === 'Out for Delivery' ? (
                       <button
                         className="deliver-btn"
-                        onClick={() => handleMarkDelivered(order.id)}
+                        onClick={() => handleMarkDelivered(order._id)}
                       >
                         ✓ Mark as Delivered
                       </button>

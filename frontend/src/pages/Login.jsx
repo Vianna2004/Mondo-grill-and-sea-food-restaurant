@@ -1,9 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
-import '../styles/Login.css'
 import axios from 'axios'
-import { useContext } from 'react'
 import { UserContext } from '../context/userContext'
+import '../styles/Login.css'
 
 
 
@@ -90,8 +89,12 @@ const Login = () => {
       }
     
 
-      // Save user info to localStorage and update context
+      // Save auth token
       localStorage.setItem('token', data.token)
+      // Only save user object for customer logins (don't overwrite when admin logs in)
+      if (data.user && Object.keys(data.user).length > 0) {
+        localStorage.setItem('user', JSON.stringify(data.user))
+      }
       setToken && setToken(data.token)
      // localStorage.setItem('userRole', userRole)
 
@@ -126,35 +129,21 @@ const Login = () => {
     return (
       <div className="login-role-container">
         <div className="role-selection-card">
-          <h1 className="role-title">👋 Welcome to Mondo Grill</h1>
+          <h1 className="role-title">Welcome to Mondo Grill</h1>
           <p className="role-subtitle">Select your login type</p>
-          
+
           <div className="role-options">
-            <button
-              className="role-btn customer-role"
-              onClick={() => setUserRole('customer')}
-            >
-              <div className="role-icon">🍽️</div>
+            <button onClick={() => setUserRole('customer')} className={`role-btn customer-role`}>
               <div className="role-name">Customer</div>
               <div className="role-desc">Order delicious seafood</div>
             </button>
-            
-            <button
-              className="role-btn admin-role"
-              onClick={() => setUserRole('admin')}
-            >
-              <div className="role-icon">👨‍💼</div>
+            <button onClick={() => setUserRole('admin')} className={`role-btn admin-role`}>
               <div className="role-name">Admin</div>
               <div className="role-desc">Manage orders & users</div>
             </button>
           </div>
-          
-          <button
-            className="go-back-btn"
-            onClick={() => navigate('/')}
-          >
-            ← Back to Home
-          </button>
+
+          <button onClick={() => navigate('/')} className="go-back-btn">← Back to Home</button>
         </div>
       </div>
     )
@@ -163,136 +152,47 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-card">
-        <button
-          className="back-to-role-btn"
-          onClick={() => {
-            setUserRole(null)
-            setEmail('')
-            setPassword('')
-            setError('')
-          }}
-        >
-          ← Change Role
-        </button>
+        <div className="mb-4" style={{ paddingLeft: '18px' }}>
+          <button onClick={() => { setUserRole(null); setEmail(''); setPassword(''); setError('') }} className="back-to-role-btn">← Change Role</button>
+        </div>
 
-        <h1 className="login-title">
-          {userRole === 'customer' ? `🍽️ Customer ${login === 'signup' ? 'Sign Up' : 'Sign In'}` : '🧑‍💼Admin Login'}
-        </h1>
-        <p className="login-subtitle">
-          {userRole === 'customer' ? 'Sign in to order your favorite dishes' : 'Sign in to manage your restaurant'}
-        </p>
+        <h1 className="login-title">{userRole === 'customer' ? `${login === 'signup' ? 'Customer Sign Up' : 'Customer Sign In'}` : 'Admin Login'}</h1>
+        <p className="login-subtitle">{userRole === 'customer' ? 'Sign in to order your favorite dishes' : 'Sign in to manage your restaurant'}</p>
 
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
+        {error && <div className="error-message">{error}</div>}
 
         <form onSubmit={onSubmit} className="login-form">
-
-         {login === 'signup' && userRole === 'customer' && <div className="form-group">
-            <label htmlFor="name">Name</label>
-            <input
-              id="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="form-input"
-              placeholder="name"
-            />
-          </div>}
+          {login === 'signup' && userRole === 'customer' && (
+            <div className="form-group">
+              <label htmlFor="name" className="form-label">Name</label>
+              <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="form-input" />
+            </div>
+          )}
 
           <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="form-input"
-              placeholder="email"
-            />
+            <label htmlFor="email" className="form-label">Email</label>
+            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@domain.com" className="form-input" />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <div className="password-wrapper">
-              <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="form-input"
-                placeholder="password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="show-password-btn"
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
+          <div className="form-group password-wrapper">
+            <label htmlFor="password" className="form-label">Password</label>
+            <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" className="form-input" />
+            <button type="button" onClick={() => setShowPassword((s) => !s)} className="show-password-btn">{showPassword ? 'Hide' : 'Show'}</button>
           </div>
 
           <div className="form-options">
-            <label className="remember-me">
-              <input type="checkbox" />
-              Remember me
-            </label>
-            <button
-              type="button"
-              onClick={() => alert('Reset password flow')}
-              className="forgot-btn"
-            >
-              Forgot?
-            </button>
+            <label className="remember-me"><input type="checkbox" /> Remember me</label>
+            <button type="button" onClick={() => alert('Reset password flow')} className="forgot-btn">Forgot?</button>
           </div>
 
-          {login === 'signup' && userRole === 'customer' ? (
-            <button
-              type="submit"
-              disabled={loading}
-              className="submit-btn"
-            >
-              {loading ? 'Signing up...' : 'Sign Up'}
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={loading}
-              className="submit-btn"
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          )}
+          <button type="submit" disabled={loading} className="submit-btn">{loading ? (login === 'signup' ? 'Signing up...' : 'Signing in...') : (login === 'signup' ? 'Sign Up' : 'Sign In')}</button>
         </form>
-
-        {/* <p className="test-note">
-          💡 For testing: Use any email (e.g., test@test.com) and password (min 6 characters)
-        </p> */}
 
         {userRole === 'customer' && (
           login === 'signup' ? (
-            <p className="toggle-login">
-              Already have an account?{' '}
-              <button
-                className="toggle-login-btn"
-                onClick={() => setLogin('login')}
-              >
-                Sign In
-              </button>
-            </p>
+            <p className="test-note">Already have an account? <button onClick={() => setLogin('login')} className="forgot-btn"> Sign In</button></p>
           ) : (
-            <p className="toggle-login">
-              Don't have an account?{' '}
-              <button
-                className="toggle-login-btn"
-                onClick={() => setLogin('signup')}
-              >
-                Sign Up
-              </button>
-            </p>
+            <p className="test-note">Don't have an account? <button onClick={() => setLogin('signup')} className="forgot-btn"> Sign Up</button></p>
           )
         )}
       </div>
